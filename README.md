@@ -87,3 +87,52 @@ After running the workflow, the following outputs will be generated:
 ![VNIR Panel detection](VNIR_vis_1.png)
 ![SWIR Panel detection](SWIR_vis_1.png)
 ![SWIR Panel double-checking](SWIR_vis_2.png)
+
+**VNIR Panel Detection (detect_panel_region)**
+
+**Goal:** Find the bright calibration panel in a VNIR datacube (visible + near-infrared light).
+
+**How it works, step by step:**
+
+- **Pick a single band to work with**
+  - The datacube has many spectral bands. We usually pick a "middle" band (default is the middle band) to analyze brightness.
+- **Normalize brightness**
+  - Convert the pixel values in that band to a 0-1 scale so it's easier to find bright spots.
+- **Thresholding**
+  - Anything brighter than 90% of the maximum brightness is considered "bright enough" to be part of the panel.
+  - This creates a **mask**: a 2D map of pixels that are likely panel pixels.
+- **Find panel boundaries**
+  - Look at the coordinates of all "bright pixels."
+  - Take the minimum and maximum x and y coordinates → this defines a bounding box around the panel.
+- **Fallback if panel is missing**
+  - If the code can't find any bright pixels, it just creates a small default box in the center.
+
+✅ **Result:** Bounding box (x1, y1, x2, y2) and the approximate panel height/width.
+
+**SWIR Panel Detection (detect_swir_panel_single_pass)**
+
+**Goal:** Find the bright calibration panel in a SWIR datacube (shortwave infrared). SWIR is trickier than VNIR because panels are less bright and detectors differ.
+
+**How it works, step by step:**
+
+- **Select 3 representative wavelengths**
+  - Pick three wavelengths across the SWIR range (default 30%, 55%, 75% of 1000-2500 nm).
+  - Avoid wavelengths where water absorption or detector noise is strong (shifts them slightly).
+- **Make a small 3-band "subcube"**
+  - Take only these three bands to reduce data size.
+  - Compute the **average brightness** across the 3 bands for each pixel → a 2D brightness map.
+- **Find the brightest pixel**
+  - Look for the pixel with the highest brightness → likely somewhere inside the panel.
+- **Estimate panel size**
+  - SWIR panels can't be detected as precisely as VNIR, so the code uses a "nominal" size based on the image width (e.g., 5% of the image width).
+- **Build a square bounding box**
+  - Centered on the brightest pixel, with side = nominal panel size.
+  - Makes sure the box stays inside the image bounds.
+- **Optional overlay**
+  - Draw a preview image with the detected panel outlined in red.
+  - Save it for verification.
+
+✅ **Result:** Bounding box (x1, y1, x2, y2) for the SWIR panel.
+
+![Panel detection diagram](panel_detection_diagram.png)
+
