@@ -1,9 +1,20 @@
+## This code was developed by Eric Hay (2025) as part of workflow and automated pipeline
+## work for the ANU Fenner School BRCoE
+
+## The below pipeline works to operate on the ANU Forest Spectroscope outputs.
+## These are from the Headwall Nano and Headwall SWIR hyperspectral / pushbroom sensors.
+
+## The code works assuming the scan captures a calibrated reflectance panel, and that calibration data are provided.
+
+## Format of panel calibration file: Wavelength and signal columns, numbers only.
+## An example panel file is provided (LARGE_PANEL.txt) that was used for ANU processing.
+
 """
 panel_reflectance_pipeline.py
 -----------------------------
 Enhanced module for VNIR/SWIR spectral datacube reflectance processing.
 
-Updates:
+Updates (4.11.25):
  - Corrected datacube orientation (Y, X, Bands)
  - Automatically generates RGB/Gray previews
  - Automatically detects and overlays panel region
