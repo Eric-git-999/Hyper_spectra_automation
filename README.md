@@ -82,7 +82,7 @@ After running the workflow, the following outputs will be generated:
 - Averaged vegetation reflectance outputs
 - CSV summaries and verification plots for visual inspection
 
-## Example Output
+## Example Notebook Output (Panel detection, setting panel region for reflectance calculation)
 
 ![VNIR Panel detection](VNIR_vis_1.png)
 ![SWIR Panel detection](SWIR_vis_1.png)
