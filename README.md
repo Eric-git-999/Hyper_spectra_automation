@@ -104,8 +104,6 @@ After running the workflow, the following outputs will be generated:
 - **Find panel boundaries**
   - Look at the coordinates of all "bright pixels."
   - Take the minimum and maximum x and y coordinates → this defines a bounding box around the panel.
-- **Fallback if panel is missing**
-  - If the code can't find any bright pixels, it just creates a small default box in the center.
 
 ✅ **Result:** Bounding box (x1, y1, x2, y2) and the approximate panel height/width.
 
