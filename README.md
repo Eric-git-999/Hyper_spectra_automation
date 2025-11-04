@@ -1,6 +1,6 @@
 # Hyper_spectra_automation
 
-Code to process ANU Forest Spectrometer outputs. This project is primarily written in Python and consists of a processing pipeline (`panel_reflectance_pipeline.py`) and a Jupyter Notebook that orchestrates the workflow and visualizes the data. The code processes multiple hyperspectral data cubes, performs automatic calibration panel detection, and converts raw spectral data to reflectance, integrating scan metadata along the way.  
+Code to process ANU Forest Spectrometer outputs. This project is primarily written in Python and consists of a processing pipeline (`panel_reflectance_pipeline.py`) and a Jupyter Notebook ('Auto_spectra.ipynb') that orchestrates the workflow and visualizes the data. The code processes multiple hyperspectral data cubes, performs automatic calibration panel detection, and converts raw spectral data to reflectance, integrating scan metadata along the way.  
 
 ## Features
 - Recursive processing of hyperspectral `.bin` files across date/instrument subfolders.  
