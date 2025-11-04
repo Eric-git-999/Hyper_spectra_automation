@@ -81,3 +81,9 @@ After running the workflow, the following outputs will be generated:
 - Processed hyperspectral data saved as NetCDF (`.nc`) files
 - Averaged vegetation reflectance outputs
 - CSV summaries and verification plots for visual inspection
+
+## Example Output
+
+![VNIR Panel detection](VNIR_vis_1.png)
+![SWIR Panel detection](SWIR_vis_1.png)
+![SWIR Panel double-checking](SWIR_vis_2.png)
