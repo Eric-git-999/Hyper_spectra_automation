@@ -33,7 +33,7 @@ The workflow is implemented in a Jupyter Notebook and follows these steps:
    - Adjust or redraw detected panel regions visually and recompute averages.
 
 7. **SWIR Panel Detection Refinement**  
-   - Revise SWIR panel detection to ensure robust pixel identification.
+   - Revise SWIR panel detection to ensure robust pixel identification. (optional, revised and removed in latest version)
 
 8. **Panel Reflectance Extraction**  
    - Compute and save reflectance values as NetCDF files.
@@ -55,7 +55,7 @@ cd Hyper_spectra_automation
 
 2. Open the main Jupyter Notebook:
 ```bash
-jupyter notebook ANU_Forest_Spectrometer_Workflow.ipynb
+jupyter notebook Auto_spectra.ipynb.ipynb
 ```
 
 3. Configure paths and run each cell sequentially.
