@@ -7,7 +7,7 @@ Code to process ANU Forest Spectrometer outputs. This project is primarily writt
 - Automatic calibration panel detection (VNIR & SWIR).  
 - Reflectance calculation using calibration panels.  
 - Export of results as NetCDF (`.nc`) files and CSV summaries.  
-- Interactive panel region adjustment for verification and correction.  
+- Interactive selection region adjustment for verification and correction.  
 - Visualization and verification plots of processed data.
 
 ## Workflow Overview
