@@ -1,48 +1,39 @@
-## This code was developed by Eric Hay (2025) as part of workflow and automated pipeline
-## work for the ANU Fenner School BRCoE
-
-## The below pipeline works to operate on the ANU Forest Spectroscope outputs.
-## These are from the Headwall Nano and Headwall SWIR hyperspectral / pushbroom sensors.
-
-## The code works assuming the scan captures a calibrated reflectance panel, and that calibration data are provided.
-
-## Format of panel calibration file: Wavelength and signal columns, numbers only.
-## An example panel file is provided (LARGE_PANEL.txt) that was used for ANU processing.
-
+# panel_reflectance_pipeline.py
 """
-panel_reflectance_pipeline.py
------------------------------
-Enhanced module for VNIR/SWIR spectral datacube reflectance processing.
+Pipeline for automated VNIR + SWIR panel detection from hyperspectral cubes.
+Includes:
+- Datacube import with orientation correction
+- VNIR panel detection (seed + region-growing)
+- SWIR local search panel detection guided by VNIR
+- Visualization helpers for VNIR/SWIR overlay
 
-Updates (4.11.25):
- - Corrected datacube orientation (Y, X, Bands)
- - Automatically generates RGB/Gray previews
- - Automatically detects and overlays panel region
- - Saves panel overlay previews for VNIR/SWIR cubes
+Usage:
+    import panel_reflectance_pipeline as adp
+    adp.set_config(vnir_min_patch=8, swir_max_candidates=3000)
+    bbox, shape, png, jsonp = adp.run_vnir_detection(path_to_vnir_bin)
+    ...
 """
 
 import numpy as np
-import os
-from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-
+from pathlib import Path
+from collections import deque
+from skimage import measure, morphology
+import json
 
 # ============================================================
-# 1️⃣ Import Datacube with Orientation + Preview
+# 1 Datacube import with orientation + preview
 # ============================================================
+# We need to be able to see what we are doing, to find the box
+# (reflectance panel) which is quite the task, especially in the SWIR wavelengths!
+
 def import_datacube(bin_path, verify_orientation=True, save_preview=True, dtype=np.uint16):
-    """
-    Import a reordered hyperspectral .bin file (3D datacube).
-    Detects VNIR vs SWIR automatically, corrects orientation,
-    and shows an RGB or grayscale preview for verification.
-    For SWIR, flips the Y-axis so origin is bottom-left.
-    """
     bin_path = Path(bin_path)
     if not bin_path.exists():
         raise FileNotFoundError(f"Datacube not found: {bin_path}")
 
-    # Parse dimensions from filename (e.g., reorder_272_2295_640_U16.bin)
+    # parse dims (expects digits in filename)
     parts = bin_path.stem.split("_")
     nums = [int(p) for p in parts if p.isdigit()]
     if len(nums) < 3:
@@ -50,26 +41,24 @@ def import_datacube(bin_path, verify_orientation=True, save_preview=True, dtype=
 
     bands, frames, spatial = nums[:3]
 
-    # Identify VNIR vs SWIR
+    # detect sensor type heuristics
     is_vnir = "reorder_272" in bin_path.stem.lower() or "hyper" in str(bin_path.parent).lower()
     is_swir = "reorder_288" in bin_path.stem.lower() or "swir" in str(bin_path.parent).lower()
 
-    # Load binary and reshape to (bands, frames, spatial)
+    # load and reshape -> (bands, frames, spatial) then transpose to (Y, X, Bands)
     cube = np.fromfile(bin_path, dtype=dtype)
     expected = bands * frames * spatial
     if cube.size != expected:
-        raise ValueError(f"Expected {expected} values but got {cube.size}")
+        raise ValueError(f"Expected {expected} values but got {cube.size} from {bin_path}")
 
     cube = cube.reshape((bands, frames, spatial))
-    cube = np.transpose(cube, (2, 1, 0))  # → (Y, X, Bands)
+    cube = np.transpose(cube, (2, 1, 0))  # (Y, X, Bands)
 
-    # --- Correct Y-axis orientation for SWIR ---
+    # correct orientation for SWIR (flipud)
     if is_swir:
         cube = np.flipud(cube)
 
-    print(f"Loaded cube: {bin_path.name}  shape={cube.shape} (Y={cube.shape[0]}, X={cube.shape[1]}, Bands={cube.shape[2]})")
-
-    # Assign wavelengths
+    # assign wavelengths (simple linspace)
     if is_vnir:
         wavelengths = np.linspace(400, 1000, bands)
     elif is_swir:
@@ -77,14 +66,10 @@ def import_datacube(bin_path, verify_orientation=True, save_preview=True, dtype=
     else:
         wavelengths = np.linspace(400, 2500, bands)
 
-    # --- Preview with axes labels and arrows ---
+    # preview optionally
     if verify_orientation:
         fig, ax = plt.subplots(figsize=(10, 5))
-
-        # Add extra top space for annotations
-        fig.subplots_adjust(top=0.75)  # reserve top 25% of figure for labels/arrows
-
-        # VNIR RGB
+        fig.subplots_adjust(top=0.75)
         if is_vnir:
             rgb_wvls = [465, 514, 656]
             rgb_idx = [np.argmin(np.abs(wavelengths - w)) for w in rgb_wvls]
@@ -92,26 +77,20 @@ def import_datacube(bin_path, verify_orientation=True, save_preview=True, dtype=
             rgb = np.clip((rgb - rgb.min()) / (rgb.max() - rgb.min()), 0, 1)
             ax.imshow(rgb)
             ax.set_title(f"VNIR RGB composite ({bin_path.name})")
-
-        # SWIR grayscale
-        elif is_swir:
+        else:
             wl_target = 1550
             idx = np.argmin(np.abs(wavelengths - wl_target))
             gray = cube[:, :, idx]
             ax.imshow(gray, cmap="gray")
             ax.set_title(f"SWIR {wl_target:.0f} nm grayscale ({bin_path.name})")
-
         ax.axis("off")
 
-        # --- Annotate axes with dimensions above image ---
         Y, X, Z = cube.shape
-        fig.text(0.1, 0.92, f"Y-axis (spatial pixels): {Y}", color='black', fontsize=10)
-        fig.text(0.1, 0.88, f"X-axis (frames/scan): {X}", color='black', fontsize=10)
-        fig.text(0.1, 0.84, f"Z-axis (bands/wavelengths): {Z}", color='black', fontsize=10)
-
-        # --- Draw arrows above image ---
+        fig.text(0.1, 0.92, f"Y-axis: {Y}", fontsize=10)
+        fig.text(0.1, 0.88, f"X-axis: {X}", fontsize=10)
+        fig.text(0.1, 0.84, f"Z-axis: {Z}", fontsize=10)
         fig.text(0.7, 0.92, "X →", color='red', fontsize=12)
-        fig.text(0.9, 0.92, "Y ↑", color='red', fontsize=12)  # arrow now points up
+        fig.text(0.9, 0.92, "Y ↑", color='red', fontsize=12)
         fig.text(0.85, 0.88, "Z (bands)", color='red', fontsize=12)
 
         if save_preview:
@@ -125,103 +104,10 @@ def import_datacube(bin_path, verify_orientation=True, save_preview=True, dtype=
 
 
 # ============================================================
-# 2️⃣ Detect Panel Region - VNIR 
+# 2 Visualization helpers
 # ============================================================
 
-import numpy as np
-import re
-from pathlib import Path
-
-def parse_shape_from_filename(filename):
-    """
-    Parse (bands, width, height) from filenames like:
-      reorder_272_2295_640_U16.bin
-      Reorder_288_2334_384_U16.bin
-
-    Returns (height, width, bands) as integers.
-    """
-    filename = Path(filename)
-    match = re.search(r"reorder_(\d+)_(\d+)_(\d+)_", filename.name, re.IGNORECASE)
-    if not match:
-        raise ValueError(f"Cannot parse shape from filename: {filename.name}")
-    bands, width, height = map(int, match.groups())
-    return height, width, bands
-
-
-def detect_panel_region(cube, vnird_bbox=None, vnir_file=None, swir_file=None, band_index=None, threshold=None):
-    """
-    Detect bright calibration panel region in VNIR or SWIR datacubes.
-
-    VNIR:
-        - Automatically detects bright region (>90% reflectance).
-    SWIR:
-        - Converts VNIR bbox → SWIR coordinates using filename-derived shapes.
-        - Expands ±15% around scaled bbox, searches for brightest region.
-        - Returns a square bounding box centered on bright centroid.
-
-    Parameters
-    ----------
-    cube : np.ndarray
-        Hyperspectral datacube (Y, X, B).
-    vnird_bbox : tuple, optional
-        Bounding box (x1, y1, x2, y2) from VNIR.
-    vnir_file, swir_file : Path-like, optional
-        Required for SWIR detection (auto parses cube shape from filename).
-    band_index : int, optional
-        VNIR band index to use for brightness detection.
-    threshold : float, optional
-        Brightness threshold fraction (default 0.9).
-
-    Returns
-    -------
-    bbox : tuple[int, int, int, int]
-        Bounding box coordinates (x1, y1, x2, y2)
-    panel_height : int
-        Height/width of detected panel region (square).
-    """
-
-    Y, X, B = cube.shape
-    sensor_type = "VNIR" if vnird_bbox is None else "SWIR"
-    print(f"[detect_panel_region] ({sensor_type}) cube shape (Y,X,B)={cube.shape}")
-
-    # =====================================================
-    # VNIR PANEL DETECTION
-    # =====================================================
-    if sensor_type == "VNIR":
-        if band_index is None:
-            band_index = B // 2
-
-        img = cube[:, :, band_index].astype(np.float32)
-        norm = (img - img.min()) / (img.max() - img.min() + 1e-8)
-        thr = threshold or 0.9
-        mask = norm >= thr
-
-        coords = np.argwhere(mask)
-        if coords.size == 0:
-            cy, cx = Y // 2, X // 2
-            bbox = (cx - 5, cy - 5, cx + 5, cy + 5)
-            print("[VNIR] fallback bbox:", bbox)
-            return bbox, 10
-
-        y_min, x_min = coords.min(axis=0)
-        y_max, x_max = coords.max(axis=0)
-        panel_height = int(max(1, y_max - y_min))
-        bbox = (int(x_min), int(y_min), int(x_max), int(y_max))
-        print(f"[VNIR] detected bbox: {bbox}, height={panel_height}")
-        return bbox, panel_height
-
-
-# ============================================================
-# 3️⃣ Visualize Scaled panel detection
-# ============================================================
 def visualize_panel_detection(cube, wavelengths, panel_bbox, save_path=None, sensor_type="VNIR"):
-    """
-    Visualize the panel region overlay on RGB (VNIR) or grayscale (SWIR) image.
-    """
-    from matplotlib.patches import Rectangle
-    import matplotlib.pyplot as plt
-    from pathlib import Path
-
     fig, ax = plt.subplots(figsize=(10, 5))
     x1, y1, x2, y2 = panel_bbox
     rect = Rectangle((x1, y1), x2 - x1, y2 - y1, linewidth=2, edgecolor='red', facecolor='none')
@@ -243,308 +129,193 @@ def visualize_panel_detection(cube, wavelengths, panel_bbox, save_path=None, sen
     ax.add_patch(rect)
     ax.axis("off")
     plt.tight_layout()
-
     if save_path:
         plt.savefig(save_path, dpi=200)
         print(f"Saved panel overlay → {Path(save_path).name}")
-
     plt.show()
 
 
 # ============================================================
-# 4️⃣ SWIR single function panel detection
+# 3 Other helpers - panel detection
 # ============================================================
+# These helpers assist us on our quest to find the box (reflectance panel)
+# in both VNIR and SWIR datacubes.
 
-def detect_swir_panel_single_pass(cube_swir, wl_pct=(0.30, 0.55, 0.75),
-                                  safe_shift_nm=-50, box_side_factor=1.0,
-                                  save_path=None, debug=False):
+def select_informative_swir_wavelengths(wavelengths):
+    target_bands = [1000, 1300, 1550, 1800, 2200]
+    return [np.argmin(np.abs(wavelengths - w)) for w in target_bands]
+
+def robust_adaptive_threshold(region_sm, percentile=95, std_factor=1.5):
+    p_thresh = np.nanpercentile(region_sm, percentile)
+    s = np.nanstd(region_sm)
+    return p_thresh + std_factor * s
+
+def ensure_python_numbers(obj):
+    if isinstance(obj, dict):
+        return {k: ensure_python_numbers(v) for k,v in obj.items()}
+    elif isinstance(obj, (list, tuple, set)):
+        cls = type(obj)
+        return cls(ensure_python_numbers(x) for x in obj)
+    elif isinstance(obj, (np.integer, np.int32, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float32, np.float64)):
+        return float(obj)
+    else:
+        return obj
+
+def normalize_for_detection(region):
+    p1, p99 = np.nanpercentile(region, [1, 99])
+    if p99 - p1 < 1e-6:
+        return np.zeros_like(region)
+    return np.clip((region - p1) / (p99 - p1), 0, 1)
+
+def advanced_morphological_cleanup(mask, min_area=10, max_area_ratio=0.3):
+    mask = morphology.remove_small_objects(mask.astype(bool), min_size=min_area)
+    labeled = measure.label(mask)
+    props = measure.regionprops(labeled)
+    total_area = mask.shape[0] * mask.shape[1]
+    filtered_mask = np.zeros_like(mask)
+    for prop in props:
+        if prop.area <= max_area_ratio * total_area:
+            filtered_mask[labeled==prop.label] = True
+    filtered_mask = morphology.binary_closing(filtered_mask, morphology.square(5))
+    filtered_mask = morphology.binary_opening(filtered_mask, morphology.square(3))
+    return filtered_mask
+
+def _clip_bbox(bbox, h, w):
+    x1, y1, x2, y2 = bbox
+    x1 = int(np.clip(int(x1), 0, w-1)); x2 = int(np.clip(int(x2), 0, w-1))
+    y1 = int(np.clip(int(y1), 0, h-1)); y2 = int(np.clip(int(y2), 0, h-1))
+    if x1 > x2: x1, x2 = x2, x1
+    if y1 > y2: y1, y2 = y2, y1
+    return (x1, y1, x2, y2)
+
+def map_vnir_to_swir_direct(vnir_bbox, vnir_shape, swir_shape):
+    x1, y1, x2, y2 = map(int, vnir_bbox)
+    v_h, v_w = int(vnir_shape[0]), int(vnir_shape[1])
+    s_h, s_w = int(swir_shape[0]), int(swir_shape[1])
+    x1_s = int(round(x1 * s_w / v_w))
+    x2_s = int(round(x2 * s_w / v_w))
+    y1_s = int(round(y1 * s_h / v_h))
+    y2_s = int(round(y2 * s_h / v_h))
+    return _clip_bbox((x1_s, y1_s, x2_s, y2_s), s_h, s_w)
+
+def build_expanded_search_box(swir_bbox, swir_shape, pct_x=0.05, pct_y=0.2):
+    s_h, s_w = swir_shape[:2]
+    x1, y1, x2, y2 = swir_bbox
+    pad_x = int(round(pct_x * s_w))
+    pad_y = int(round(pct_y * s_h))
+    return _clip_bbox((x1-pad_x, y1-pad_y, x2+pad_x, y2+pad_y), s_h, s_w)
+
+## test - remove these helpers as well:
+# Helper: extract panel subcube
+def extract_panel_subcube(full_cube, detected_bbox_full):
+    x1, y1, x2, y2 = map(int, detected_bbox_full)
+    return full_cube[y1:y2+1, x1:x2+1, :]
+
+# Helper: visualize full-cube SWIR overlay
+def visualize_swir_panel_overlay(cube, bbox, wavelengths, save_path):
     """
-    Single-pass SWIR panel detection using 3-band subcube across the whole image.
-    
-    Args:
-        cube_swir : np.ndarray (Y, X, B)
-            SWIR datacube in display orientation
-        wl_pct : tuple of floats
-            Fraction across 1000-2500 nm to choose 3 wavelengths
-        safe_shift_nm : int
-            Shift if chosen wavelength falls in strong absorption
-        box_side_factor : float
-            Final box side = panel_height_s * box_side_factor
-        save_path : Path or str, optional
-            Path to save diagnostic PNG
-        debug : bool
-            Print debug information
-            
-    Returns:
-        refined_bbox (x1, y1, x2, y2)
+    Visualize SWIR full-cube overlay using a single wavelength (1550nm) in greyscale,
+    with detected panel bbox overlaid.
     """
-    Y, X, B = cube_swir.shape
-    wavelengths = np.linspace(1000, 2500, B)
-    
-    # Select 3 safe wavelengths
-    chosen_wls = []
-    for p in wl_pct:
-        w = 1000 + p*(2500-1000)
-        if 1390 <= w <= 1420 or 1980 <= w <= 2020 or 2380 <= w <= 2420:
-            w += safe_shift_nm
-        chosen_wls.append(w)
-    idxs = [int(np.argmin(np.abs(wavelengths - w))) for w in chosen_wls]
-    if debug: print("[SWIR single-pass] chosen wavelengths:", chosen_wls, "band indices:", idxs)
-    
-    # Build subcube (Y, X, 3)
-    subcube = np.stack([cube_swir[:, :, i] for i in idxs], axis=-1).astype(np.float32)
-    
-    # Brightness map
-    brightness = subcube.mean(axis=2)
-    
-    # Detect brightest pixel
-    flat_idx = np.nanargmax(brightness)
-    cy, cx = np.unravel_index(flat_idx, brightness.shape)
-    if debug: print(f"[SWIR single-pass] brightest pixel at (x,y)=({cx},{cy})")
-    
-    # Determine nominal panel size (use median of width/height or arbitrary fraction)
-    # Here, use 5% of image width as rough panel size
-    nominal_side = int(min(X, Y) * 0.05 * box_side_factor)
-    half_side = nominal_side // 2
-    
-    # Build square bbox
-    x1 = max(0, cx - half_side)
-    x2 = min(X, cx + half_side)
-    y1 = max(0, cy - half_side)
-    y2 = min(Y, cy + half_side)
-    refined_bbox = (x1, y1, x2, y2)
-    
-    # Optional diagnostic plot
-    if save_path is not None:
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import Rectangle
-        fig, ax = plt.subplots(figsize=(10, 5))
-        # normalized 3-band RGB
-        rgb_disp = subcube.copy()
-        for k in range(3):
-            mn, mx = np.nanmin(rgb_disp[:,:,k]), np.nanmax(rgb_disp[:,:,k])
-            rgb_disp[:,:,k] = (rgb_disp[:,:,k]-mn)/(mx-mn+1e-9)
-        ax.imshow(np.clip(rgb_disp,0,1))
-        ax.add_patch(Rectangle((x1, y1), x2-x1, y2-y1,
-                               linewidth=2, edgecolor='red', facecolor='none'))
-        ax.scatter([cx],[cy], marker='x', c='lime')
-        ax.set_title("SWIR panel single-pass panel detection")
-        ax.axis('off')
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=200)
-        plt.close(fig)
-        if debug: print(f"[SWIR single-pass] saved diagnostic overlay: {save_path}")
-    
-    return refined_bbox
+    # --- Find the band index closest to 1550nm ---
+    target_wavelength = 1550
+    band_idx = int(np.argmin(np.abs(wavelengths - target_wavelength)))
 
-def swir_composite(cube, wl_pct=(0.30, 0.55, 0.75)):
-    h, w, bands = cube.shape
-    b1 = int(bands * wl_pct[0])
-    b2 = int(bands * wl_pct[1])
-    b3 = int(bands * wl_pct[2])
-    comp = np.stack([
-        cube[:, :, b1],
-        cube[:, :, b2],
-        cube[:, :, b3]
-    ], axis=-1)
-    
-    # normalize to 0-255 for display
-    comp = comp.astype(float)
-    comp -= comp.min()
-    comp /= comp.max()
-    comp = (comp * 255).astype(np.uint8)
-    return comp
+    # --- Extract that band ---
+    img = cube[:, :, band_idx].astype(np.float32)
+    mn, mx = np.nanmin(img), np.nanmax(img)
+    if mx - mn < 1e-6:
+        img_norm = np.zeros_like(img)
+    else:
+        img_norm = (img - mn) / (mx - mn)
+
+    # --- Plot greyscale ---
+    x1, y1, x2, y2 = map(int, bbox)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.imshow(img_norm, cmap='gray')
+    ax.add_patch(Rectangle((x1, y1), x2 - x1, y2 - y1,
+                           edgecolor='lime', facecolor='none', linewidth=2))
+    ax.set_title(f"SWIR full-cube overlay ({target_wavelength}nm)")
+    ax.axis('off')
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=200)
+    plt.close(fig)
+    print(f"✅ Full SWIR overlay saved (greyscale {target_wavelength}nm): {save_path}")
 
 
 # ============================================================
-# 5️⃣ Compute Panel Reflectance
+# 4 Other helpers - reflectance conversion
 # ============================================================
-
-def compute_panel_reflectance(cube, panel_bbox, panel_cal_file, wavelengths=None):
-    x1, y1, x2, y2 = panel_bbox
-    panel_region = cube[y1:y2, x1:x2, :]
-    mean_panel_signal = panel_region.mean(axis=(0, 1))
-    cal_data = np.loadtxt(panel_cal_file, comments="#", usecols=(0, 1))
-    cal_wvl, cal_refl = cal_data[:, 0], cal_data[:, 1]
-    if wavelengths is None:
-        wavelengths = np.linspace(cal_wvl.min(), cal_wvl.max(), cube.shape[-1])
-    interp_reflectance = np.interp(wavelengths, cal_wvl, cal_refl)
-    return mean_panel_signal, interp_reflectance
-
-
-# ============================================================
-# 6️⃣ Apply Reflectance Correction
-# ============================================================
-
-def apply_reflectance_correction(cube, mean_panel_signal, interp_panel_reflectance, panel_bbox):
-    safe_panel = np.where(mean_panel_signal == 0, np.nan, mean_panel_signal)
-    correction_factor = interp_panel_reflectance / safe_panel
-    corrected_cube = cube * correction_factor[np.newaxis, np.newaxis, :]
-    x1, y1, x2, y2 = panel_bbox
-    corrected_cube[y1:y2, x1:x2, :] = np.nan
-    return corrected_cube
-
-
-# ============================================================
-# 7️⃣ Export
-# ============================================================
-
-def export_reflectance_data(cube, output_path):
-    output_path = Path(output_path)
-    if output_path.suffix == "":
-        output_path = output_path.with_suffix(".npy")
-    np.save(output_path, cube)
-    print(f"Exported reflectance cube → {output_path.name}")
-
-# ============================================================
-# 8️⃣ NetCDF export (improved) + panel extraction (fixed)
-# ============================================================
+import numpy as np
 import xarray as xr
+import matplotlib.pyplot as plt
+from pathlib import Path
+import pandas as pd
 
-def export_reflectance_to_netcdf(cube, wavelengths, output_path, var_name="reflectance"):
-    """
-    Export a 3D cube (Y,X,Bands) to NetCDF with wavelength coordinate.
-    cube shape must be (y, x, bands).
-    """
-    output_path = Path(output_path)
-    if output_path.suffix != ".nc":
-        output_path = output_path.with_suffix(".nc")
+def read_detection_json(json_path: Path):
+    """Read VNIR or SWIR detection JSON and return .bin path + bbox."""
+    with open(json_path, "r") as f:
+        data = json.load(f)
+    bin_path = Path(data["file"]) if "file" in data else None
+    bbox = None
+    source = "unknown"
+    if "bbox" in data and "vnir" in json_path.name.lower():
+        bbox = tuple(map(int, data["bbox"]))
+        source = "VNIR"
+    elif "detected_bbox" in data:
+        bbox = tuple(map(int, data["detected_bbox"]))
+        source = "SWIR"
+    elif "mapped_direct_bbox" in data:
+        bbox = tuple(map(int, data["mapped_direct_bbox"]))
+        source = "SWIR-mapped"
+    else:
+        raise KeyError(f"No usable bbox found in JSON: {json_path}")
+    return bin_path, bbox, data, source
 
-    # Build xarray dataset with dims (y, x, wavelength)
+def extract_panel_region(cube, bbox):
+    """Extract panel subcube using bounding box."""
+    x1, y1, x2, y2 = map(int, bbox)
+    return cube[y1:y2+1, x1:x2+1, :]
+
+def compute_calibration_coeff(panel_cube, panel_cal):
+    """Compute per-band calibration coefficient: counts / known reflectance."""
+    panel_median = np.nanmedian(panel_cube, axis=(0,1))
+    num_bands = len(panel_median)
+    cal_interp = np.interp(np.arange(num_bands), panel_cal["wavelength"], panel_cal["value"])
+    cal_coeff = panel_median / cal_interp  # DN / known reflectance
+    return cal_coeff
+
+def normalize_cube_to_panel(cube, cal_coeff, epsilon=1e-6):
+    """Convert raw cube to reflectance using calibration coefficient."""
+    safe_coeff = np.where(cal_coeff == 0, epsilon, cal_coeff)
+    return cube / safe_coeff  # broadcast along bands
+
+def export_reflectance_netcdf(reflectance_cube, wavelengths, save_path):
+    """Save reflectance datacube as NetCDF using netcdf4 engine."""
     ds = xr.Dataset(
-        {var_name: (("y", "x", "wavelength"), cube.astype(np.float32))},
+        {"reflectance": (("y", "x", "wavelength"), reflectance_cube.astype(np.float32))},
         coords={
-            "y": np.arange(cube.shape[0]),
-            "x": np.arange(cube.shape[1]),
+            "y": np.arange(reflectance_cube.shape[0]),
+            "x": np.arange(reflectance_cube.shape[1]),
             "wavelength": wavelengths
         }
     )
-    ds.to_netcdf(output_path)
-    print(f"Saved NetCDF reflectance → {output_path.name}")
+    ds.to_netcdf(save_path, engine='netcdf4')
+    print(f"✅ Saved reflectance cube: {save_path.name}")
 
-
-def compute_panel_reflectance(cube, panel_bbox, panel_cal_file, wavelengths=None):
-    """
-    Return mean_panel_signal (raw instrument units) and interp_panel_reflectance (known panel reflectance).
-    This function does NOT apply the correction to the whole cube.
-    """
-    x1, y1, x2, y2 = panel_bbox
-    panel_region = cube[y1:y2, x1:x2, :]  # shape = (yp, xp, bands)
-    mean_panel_signal = np.nanmean(panel_region, axis=(0, 1))  # (bands,)
-
-    # load calibration file (wavelength, reflectance)
-    cal_data = np.loadtxt(panel_cal_file, comments="#", usecols=(0, 1))
-    cal_wvl, cal_refl = cal_data[:, 0], cal_data[:, 1]
-
-    # if wavelengths provided, interpolate calibration to cube bands
-    if wavelengths is None:
-        wavelengths = np.linspace(cal_wvl.min(), cal_wvl.max(), cube.shape[-1])
-
-    interp_reflectance = np.interp(wavelengths, cal_wvl, cal_refl)
-    return mean_panel_signal, interp_reflectance
-
-
-def extract_panel_reflectance_cube(cube, panel_bbox, panel_cal_file, wavelengths=None):
-    """
-    Extract the panel region from cube and convert it to reflectance using
-    the panel calibration file.
-
-    Returns:
-        panel_reflectance_cube: shape (yp, xp, bands) float32
-        mean_panel_signal: (bands,) average raw signal from panel pixels
-        interp_reflectance: (bands,) known panel reflectance (interpolated)
-    """
-    x1, y1, x2, y2 = panel_bbox
-    panel_region = cube[y1:y2, x1:x2, :].astype(np.float32)  # (yp, xp, bands)
-
-    if panel_region.size == 0:
-        raise ValueError("Panel region is empty. Check panel_bbox coordinates.")
-
-    # compute mean raw signal across panel pixels per band
-    mean_panel_signal = np.nanmean(panel_region, axis=(0, 1))  # (bands,)
-
-    # interpolate calibration reflectance
-    cal_data = np.loadtxt(panel_cal_file, comments="#", usecols=(0, 1))
-    cal_wvl, cal_refl = cal_data[:, 0], cal_data[:, 1]
-    if wavelengths is None:
-        wavelengths = np.linspace(cal_wvl.min(), cal_wvl.max(), cube.shape[-1])
-    interp_reflectance = np.interp(wavelengths, cal_wvl, cal_refl)  # (bands,)
-
-    # protect against zeros
-    safe_mean = np.where(mean_panel_signal == 0, np.nan, mean_panel_signal)
-
-    # correction factor: multiply raw -> reflectance
-    correction_factor = interp_reflectance / safe_mean  # shape (bands,)
-
-    # Apply per-band correction to the panel pixels (broadcast across spatial dims)
-    panel_reflectance = panel_region * correction_factor[np.newaxis, np.newaxis, :]
-
-    # diagnostics: mean of converted panel pixels should ~ interp_reflectance
-    panel_mean_after = np.nanmean(panel_reflectance, axis=(0, 1))
-    # Compute simple difference stats
-    diff = panel_mean_after - interp_reflectance
-    max_abs_diff = np.nanmax(np.abs(diff))
-    mean_rel_error = np.nanmean(np.abs(diff) / (np.where(interp_reflectance == 0, 1e-12, interp_reflectance)))
-
-    print("=== Panel conversion diagnostics ===")
-    print(f"Panel pixel block shape: {panel_reflectance.shape}")
-    print(f"Mean panel reflectance (post-conversion) -> first 5 bands: {panel_mean_after[:5]}")
-    print(f"Expected interp reflectance -> first 5 bands: {interp_reflectance[:5]}")
-    print(f"Max abs difference: {max_abs_diff:.6f}")
-    print(f"Mean relative error: {mean_rel_error:.6f}")
-    if max_abs_diff > 1e-2 or mean_rel_error > 0.01:
-        print("⚠️  Warning: panel mean after conversion differs from calibration by more than tolerance.")
-        print("  - This may indicate an incorrect panel bbox, wrong calibration file, or additional instrument scaling required.")
-
-    return panel_reflectance.astype(np.float32), mean_panel_signal.astype(np.float32), interp_reflectance.astype(np.float32)
-
-
-def extract_region_around_panel(cube, panel_bbox, interp_panel_reflectance=None, panel_mean_signal=None, x_fraction=0.1):
-    """
-    Extract sub-regions to the left and right of the panel (+/- x_fraction*panel_width)
-    and convert them to reflectance using either:
-      - interp_panel_reflectance (preferred), OR
-      - panel_mean_signal (raw) together with interpolated panel reflectance.
-
-    Returns:
-        combined_reflectance: concatenated reflectance regions (y, x_total, bands)
-    """
-    Y, X, B = cube.shape
-    x1, y1, x2, y2 = panel_bbox
-    panel_width = x2 - x1
-    x_offset = int(panel_width * x_fraction)
-
-    # left region
-    x_start_left = max(0, x1 - x_offset)
-    x_end_left = x1
-    # right region
-    x_start_right = x2
-    x_end_right = min(X, x2 + x_offset)
-
-    regions = []
-    for xs, xe in [(x_start_left, x_end_left), (x_start_right, x_end_right)]:
-        if xe <= xs:
-            # empty region; create empty array
-            regions.append(np.zeros((Y, 0, B), dtype=np.float32))
-            continue
-        region_cube = cube[:, xs:xe, :].astype(np.float32)
-
-        # determine correction factor per band
-        if interp_panel_reflectance is not None and panel_mean_signal is not None:
-            safe_mean = np.where(panel_mean_signal == 0, np.nan, panel_mean_signal)
-            corr = interp_panel_reflectance / safe_mean
-        elif interp_panel_reflectance is not None:
-            # we need mean raw signal estimate — approximate with region mean? less ideal.
-            mean_est = np.nanmean(region_cube, axis=(0, 1))
-            safe_mean = np.where(mean_est == 0, np.nan, mean_est)
-            corr = interp_panel_reflectance / safe_mean
-            print("⚠️  Using region mean as approximation for correction factor (not recommended).")
-        else:
-            raise ValueError("Provide interp_panel_reflectance (preferred) and panel_mean_signal.")
-
-        region_reflectance = region_cube * corr[np.newaxis, np.newaxis, :]
-        regions.append(region_reflectance)
-
-    # concatenate along x axis (axis=1)
-    combined_reflectance = np.concatenate(regions, axis=1)
-    return combined_reflectance
+def quick_reflectance_plot(wavelengths, panel_refl, cube_type, save_csv_path=None):
+    """Plot median panel reflectance spectrum and optionally save CSV."""
+    plt.figure(figsize=(6, 3))
+    plt.plot(wavelengths, panel_refl, lw=1.2)
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("Median Reflectance")
+    plt.title(f"{cube_type} - Median Panel Reflectance")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+    if save_csv_path:
+        df = pd.DataFrame({"wavelength_nm": wavelengths, "median_reflectance": panel_refl})
+        df.to_csv(save_csv_path, index=False)
+        print(f"✅ Saved median panel reflectance CSV: {save_csv_path.name}")
