@@ -1,5 +1,5 @@
 # Hyper_spectra_automation
-## Reflectance detection conversion pipeline:
+## Automated white reference panel detection in VNIR and SWIR hyperspectral datacubes and reflectance cube processing:
 Code to process ANU Forest Spectrometer hyperspectral outputs. This project is primarily written in Python and consists of Python helper functions (`panel_reflectance_pipeline.py`) and a Jupyter Notebook (`auto_spectra.ipynb`) that orchestrates the workflow and visualises the data. The code processes multiple hyperspectral data cubes (both VNIR and SWIR), performs automatic reflectance calibration panel detection, and converts raw spectral data to reflectance, integrating scan metadata.  
 
 ## Features
