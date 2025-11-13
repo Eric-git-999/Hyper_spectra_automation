@@ -63,15 +63,23 @@ This workflow requires the following Python libraries:
 - Matplotlib
 - xarray
 - netCDF4
+- os
+- collections
+- skimage
+- scipy.ndimage
+- IPython.display
+- importlib
+- gc
+- json
 - Any other libraries listed in the notebook or in `requirements.txt`
 
 ## Output
 
 After running the workflow, the following outputs will be generated:
 
-- Processed hyperspectral data saved as NetCDF (`.nc`) files
-- Averaged vegetation reflectance outputs
-- CSV summaries and verification plots for visual inspection
+- Processed hyperspectral reflectance datacubes saved as NetCDF (`.nc`) files, for both VNIR and SWIR cubes
+- Median panel reflectance values, saved as a .csv for each scan
+- Verification plots for visual inspection, showing panel detection regions and representations of the imported datacubes with panel detection overlay
 
 ## Example Notebook Output (Panel detection, setting panel region for reflectance calculation)
 
