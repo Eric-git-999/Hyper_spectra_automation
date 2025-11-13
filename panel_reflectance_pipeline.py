@@ -5,7 +5,7 @@ Includes:
 - Datacube import with orientation correction
 - VNIR panel detection (seed + region-growing)
 - SWIR local search panel detection guided by VNIR
-- Visualization helpers for VNIR/SWIR overlay
+- visualisation helpers for VNIR/SWIR overlay
 
 Usage:
     import panel_reflectance_pipeline as adp
@@ -104,10 +104,10 @@ def import_datacube(bin_path, verify_orientation=True, save_preview=True, dtype=
 
 
 # ============================================================
-# 2 Visualization helpers
+# 2 visualisation helpers
 # ============================================================
 
-def visualize_panel_detection(cube, wavelengths, panel_bbox, save_path=None, sensor_type="VNIR"):
+def visualise_panel_detection(cube, wavelengths, panel_bbox, save_path=None, sensor_type="VNIR"):
     fig, ax = plt.subplots(figsize=(10, 5))
     x1, y1, x2, y2 = panel_bbox
     rect = Rectangle((x1, y1), x2 - x1, y2 - y1, linewidth=2, edgecolor='red', facecolor='none')
@@ -163,7 +163,7 @@ def ensure_python_numbers(obj):
     else:
         return obj
 
-def normalize_for_detection(region):
+def normalise_for_detection(region):
     p1, p99 = np.nanpercentile(region, [1, 99])
     if p99 - p1 < 1e-6:
         return np.zeros_like(region)
@@ -213,10 +213,10 @@ def extract_panel_subcube(full_cube, detected_bbox_full):
     x1, y1, x2, y2 = map(int, detected_bbox_full)
     return full_cube[y1:y2+1, x1:x2+1, :]
 
-# Helper: visualize full-cube SWIR overlay
-def visualize_swir_panel_overlay(cube, bbox, wavelengths, save_path):
+# Helper: visualise full-cube SWIR overlay
+def visualise_swir_panel_overlay(cube, bbox, wavelengths, save_path):
     """
-    Visualize SWIR full-cube overlay using a single wavelength (1550nm) in greyscale,
+    visualise SWIR full-cube overlay using a single wavelength (1550nm) in greyscale,
     with detected panel bbox overlaid.
     """
     # --- Find the band index closest to 1550nm ---
@@ -287,7 +287,7 @@ def compute_calibration_coeff(panel_cube, panel_cal):
     cal_coeff = panel_median / cal_interp  # DN / known reflectance
     return cal_coeff
 
-def normalize_cube_to_panel(cube, cal_coeff, epsilon=1e-6):
+def normalise_cube_to_panel(cube, cal_coeff, epsilon=1e-6):
     """Convert raw cube to reflectance using calibration coefficient."""
     safe_coeff = np.where(cal_coeff == 0, epsilon, cal_coeff)
     return cube / safe_coeff  # broadcast along bands
