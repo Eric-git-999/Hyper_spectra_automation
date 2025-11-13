@@ -43,7 +43,9 @@ git clone https://github.com/Eric-git-999/Hyper_spectra_automation.git
 cd Hyper_spectra_automation
 ```
 ```text
-move or copy the notebook 'auto_spectra.ipynb', python file 'panel_reflectance_pipeline.py' and panel calibration file 'LARGE_PANEL.txt' to your working directory, above the data folders:
+move or copy the notebook 'auto_spectra.ipynb', python file 'panel_reflectance_pipeline.py' and panel calibration file
+<br>
+ 'LARGE_PANEL.txt' to your working directory, above the data folders:
 ```
 ```text
 Base directory (save and run the Jupyter notebook and files here)
