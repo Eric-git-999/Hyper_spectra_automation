@@ -41,6 +41,8 @@ The workflow is implemented in a Jupyter Notebook and follows these steps:
 ```bash
 git clone https://github.com/Eric-git-999/Hyper_spectra_automation.git
 cd Hyper_spectra_automation
+```
+```text
 move or copy the notebook 'auto_spectra.ipynb', python file 'panel_reflectance_pipeline.py' and panel calibration file 'LARGE_PANEL.txt' to your working directory, above the data folders:
 ```
 ```text
