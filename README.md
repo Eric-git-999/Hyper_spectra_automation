@@ -7,7 +7,7 @@ Code to process ANU Forest Spectrometer hyperspectral outputs. This project is p
 - Automatic calibration panel detection (VNIR & SWIR).  
 - Reflectance calculation using calibration panels.  
 - Export of results as NetCDF (`.nc`) files and CSV summaries.   
-- visualisation and verification plots of processed data.
+- Visualisation and verification plots of processed data.
 
 ## Workflow Overview
 
@@ -48,7 +48,7 @@ cd Hyper_spectra_automation
 jupyter notebook auto_spectra.ipynb
 ```
 
-3. Configure paths and run each cell sequentially.
+3. Configure paths and run each cell sequentially. Ensure dependencies are installed, it is recommended to set up a new Conda environemnt for this workflow.
 
 
 ## Dependencies
