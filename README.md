@@ -79,7 +79,7 @@ After running the workflow, the following outputs will be generated:
 - Median panel reflectance values, saved as a .csv for each scan
 - Verification plots for visual inspection, showing panel detection regions and representations of the imported datacubes with panel detection overlay
 
-## Example Notebook Outputs: panel detection verification imagery, check of reflectance datacube (SWIR)
+## Example Notebook Outputs: panel detection verification imagery, check reflectance datacube (SWIR)
 
 ![VNIR Panel detection 1](images/VNIR1.png)
 ![SWIR Panel detection 1](images/SWIR1.png)
