@@ -17,32 +17,23 @@ The workflow is implemented in a Jupyter Notebook and follows these steps:
 1. **Imports & Configuration Paths**  
    - Load required Python libraries and define paths to raw data, calibration files, and output directories.
 
-2. **Pipeline Module Import**  
+2. **Automated panel detection workflow**  
    - Import functions from `panel_reflectance_pipeline.py` for data processing and analysis.
+   - Iterates through scan subfolders, working on the instrument output (reordered .bin datacube files). The detection is based on brightness, pixel thresholding and for SWIR, a subset region based on the VNIR detection which is more robust.
 
-3. **Test Run: Panel Detection**  
-   - Run a first test of panel selection to display detected panel regions.
+3. **Panel-based Reflectance Conversion Pipeline - VNIR & SWIR**  
+   - Uses the detected panel regions and for both VNIR and SWIR, using the panel calibration file "LARGE_PANEL.txt".
+   - Computes the median reflectance value for the panel region, saves this as a .csv, and processes the original datacube to a reflectance datacube.
 
-4. **Calibration File Check**  
-   - Verify reflectance calibration panel data and parameters.
+4. **Panel Detection Recovery Workflow (Manual Reflectance Assignment)**  
+   - exists as a catch for failed panel detection files.
+   - It reads the error report (.txt, if exists) to show which files need to have a panel region applied and allows the use of an adjacent scan (that had successful panel detection) to use that reflectance median for either VNIR / SWIR and apply datacube reflectance conversion based on the supplied reflectance panel data.
 
-5. **Recursive Multi-Folder Processing**  
+5. **Interactive NetCDF Reflectance Cube Viewer**  
    - Walk through all date/instrument folders and process each SWIR/VNIR `.bin` file automatically.
 
 6. **Interactive Panel Polygon Editor (Optional)**  
-   - Adjust or redraw detected panel regions visually and recompute averages.
-
-7. **SWIR Panel Detection Refinement**  
-   - Revise SWIR panel detection to ensure robust pixel identification. (optional, revised and removed in latest version)
-
-8. **Panel Reflectance Extraction**  
-   - Compute and save reflectance values as NetCDF files.
-
-9. **Vegetation Reflectance Extraction**  
-   - Extract regions around the panel and save averaged vegetation reflectance as NetCDF files.
-
-10. **Output Review & Export**  
-    - Inspect `.nc` outputs, export CSVs, and generate verification plots.
+   - Allows you to specify a netCDF reflectance cube to examine how it looks.
 
 ## Usage
 
@@ -87,50 +78,5 @@ After running the workflow, the following outputs will be generated:
 ![VNIR Panel detection](VNIR_vis_1.png)
 ![SWIR Panel detection](SWIR_vis_1.png)
 ![SWIR Panel double-checking](SWIR_vis_2.png)
-
-**VNIR Panel Detection (detect_panel_region)**
-
-**Goal:** Find the bright calibration panel in a VNIR datacube (visible + near-infrared light).
-
-**How it works, step by step:**
-
-- **Pick a single band to work with**
-  - The datacube has many spectral bands. We usually pick a "middle" band (default is the middle band) to analyze brightness.
-- **Normalize brightness**
-  - Convert the pixel values in that band to a 0-1 scale so it's easier to find bright spots.
-- **Thresholding**
-  - Anything brighter than 90% of the maximum brightness is considered "bright enough" to be part of the panel.
-  - This creates a **mask**: a 2D map of pixels that are likely panel pixels.
-- **Find panel boundaries**
-  - Look at the coordinates of all "bright pixels."
-  - Take the minimum and maximum x and y coordinates → this defines a bounding box around the panel.
-
-✅ **Result:** Bounding box (x1, y1, x2, y2) and the approximate panel height/width.
-
-**SWIR Panel Detection (detect_swir_panel_single_pass)**
-
-**Goal:** Find the bright calibration panel in a SWIR datacube (shortwave infrared). SWIR is trickier than VNIR because panels are less bright and detectors differ.
-
-**How it works, step by step:**
-
-- **Select 3 representative wavelengths**
-  - Pick three wavelengths across the SWIR range (default 30%, 55%, 75% of 1000-2500 nm).
-  - Avoid wavelengths where water absorption or detector noise is strong (shifts them slightly).
-- **Make a small 3-band "subcube"**
-  - Take only these three bands to reduce data size.
-  - Compute the **average brightness** across the 3 bands for each pixel → a 2D brightness map.
-- **Find the brightest pixel**
-  - Look for the pixel with the highest brightness → likely somewhere inside the panel.
-- **Estimate panel size**
-  - SWIR panels can't be detected as precisely as VNIR, so the code uses a "nominal" size based on the image width (e.g., 5% of the image width).
-- **Build a square bounding box**
-  - Centered on the brightest pixel, with side = nominal panel size.
-  - Makes sure the box stays inside the image bounds.
-- **Optional overlay**
-  - Draw a preview image with the detected panel outlined in red.
-  - Save it for verification.
-
-✅ **Result:** Bounding box (x1, y1, x2, y2) for the SWIR panel.
-
 ![Panel detection diagram](panel_detection_diagram.png)
 
