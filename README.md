@@ -26,13 +26,13 @@ The workflow is implemented in a Jupyter Notebook and follows these steps:
    - Computes the median reflectance value for the panel region, saves this as a .csv, and processes the original datacube to a reflectance datacube.
 
 4. **Panel Detection Recovery Workflow (Manual Reflectance Assignment)**  
-   - exists as a catch for failed panel detection files.
+   - Exists as a catch for failed panel detection files.
    - It reads the error report (.txt, if exists) to show which files need to have a panel region applied and allows the use of an adjacent scan (that had successful panel detection) to use that reflectance median for either VNIR / SWIR and apply datacube reflectance conversion based on the supplied reflectance panel data.
 
-5. **Interactive NetCDF Reflectance Cube Viewer**  
-   - Walk through all date/instrument folders and process each SWIR/VNIR `.bin` file automatically.
+5. **Append Metadata to Reflectance NetCDFs**  
+   - Iterates through each day folder, locates VNIR and SWIR reflectance NetCDF files (either normal or recovered), reads the day's metadata Index.txt, and appends the matching metadata entry to each pair of reflectance NetCDF files.
 
-6. **Interactive Panel Polygon Editor (Optional)**  
+6. **Interactive NetCDF Reflectance Cube Viewer**  
    - Allows you to specify a netCDF reflectance cube to examine how it looks.
 
 ## Usage
