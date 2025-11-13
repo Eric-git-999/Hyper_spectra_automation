@@ -41,7 +41,49 @@ The workflow is implemented in a Jupyter Notebook and follows these steps:
 ```bash
 git clone https://github.com/Eric-git-999/Hyper_spectra_automation.git
 cd Hyper_spectra_automation
+move or copy the notebook 'auto_spectra.ipynb', python file 'panel_reflectance_pipeline.py' and panel calibration file 'LARGE_PANEL.txt' to your working directory, above the data folders:
 ```
+```text
+Base directory (save and run the Jupyter notebook and files here)
+
+    Date folder 1 (i.e. 20241002)>
+        Hyper >
+            Scan1_DRK 
+                > skipped
+            Scan1_SCN 
+                > VNIR .bin file 1
+            Scan2_DRK 
+                > skipped
+            Scan2_SCN 
+                > VNIR .bin file 2
+            etc
+        SWIR > 
+            Scan1 
+                > SWIR .bin file 1
+            Scan2 
+                > SWIR .bin file 2
+            etc
+            
+    Date folder 2 (i.e. 20241003>
+        Hyper >
+            Scan1_DRK 
+                > skipped
+            Scan1_SCN 
+                > VNIR .bin file 1
+            Scan2_DRK 
+                > skipped
+            Scan2_SCN 
+                > VNIR .bin file 2
+            etc
+        SWIR > 
+            Scan1 
+                > SWIR .bin file 1
+            Scan2 
+                > SWIR .bin file 2
+            etc
+    etc
+```
+
 
 2. Open the main Jupyter Notebook:
 ```bash
