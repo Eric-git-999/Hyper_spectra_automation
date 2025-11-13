@@ -45,7 +45,7 @@ cd Hyper_spectra_automation
 
 2. Open the main Jupyter Notebook:
 ```bash
-jupyter notebook Auto_spectra.ipynb.ipynb
+jupyter notebook auto_spectra.ipynb
 ```
 
 3. Configure paths and run each cell sequentially.
