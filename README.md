@@ -51,12 +51,8 @@ Base directory (save and run the Jupyter notebook and files here)
 
     Date folder 1 (i.e. 20241002)>
         Hyper >
-            Scan1_DRK 
-                > skipped
             Scan1_SCN 
                 > VNIR .bin file 1
-            Scan2_DRK 
-                > skipped
             Scan2_SCN 
                 > VNIR .bin file 2
             etc
@@ -69,12 +65,8 @@ Base directory (save and run the Jupyter notebook and files here)
             
     Date folder 2 (i.e. 20241003>
         Hyper >
-            Scan1_DRK 
-                > skipped
             Scan1_SCN 
                 > VNIR .bin file 1
-            Scan2_DRK 
-                > skipped
             Scan2_SCN 
                 > VNIR .bin file 2
             etc
