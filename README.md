@@ -50,7 +50,6 @@ jupyter notebook auto_spectra.ipynb
 
 3. Configure paths and run each cell sequentially.
 
-4. Optional: Adjust panel regions interactively as needed.
 
 ## Dependencies
 
