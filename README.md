@@ -50,6 +50,7 @@ move or copy the notebook 'auto_spectra.ipynb', python file 'panel_reflectance_p
 Base directory (save and run the Jupyter notebook and files here)
 
     Date folder 1 (i.e. 20241002)>
+        Metadata
         Hyper >
             Scan1_SCN 
                 > VNIR .bin file 1
@@ -64,6 +65,7 @@ Base directory (save and run the Jupyter notebook and files here)
             etc
             
     Date folder 2 (i.e. 20241003>
+        Metadata
         Hyper >
             Scan1_SCN 
                 > VNIR .bin file 1
