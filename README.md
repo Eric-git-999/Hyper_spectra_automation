@@ -106,6 +106,7 @@ This workflow requires the following Python libraries:
 - importlib
 - gc
 - json
+- re
 - Any other libraries listed in the notebook or in `requirements.txt`
 
 ## Output
