@@ -1,33 +1,29 @@
 # panel_reflectance_pipeline.py
 """
-Pipeline for automated VNIR + SWIR panel detection from hyperspectral cubes.
-Includes:
-- Datacube import with orientation correction
-- VNIR panel detection (seed + region-growing)
-- SWIR local search panel detection guided by VNIR
-- visualisation helpers for VNIR/SWIR overlay
+Helper function module for automated VNIR + SWIR panel detection from hyperspectral cubes.
 
 Usage:
-    import panel_reflectance_pipeline as adp
-    adp.set_config(vnir_min_patch=8, swir_max_candidates=3000)
-    bbox, shape, png, jsonp = adp.run_vnir_detection(path_to_vnir_bin)
+    import panel_reflectance_pipeline.py in the Jupyter Notebook by running through the cells.
     ...
 """
-
+#Check core packages are loaded:
 import numpy as np
+import xarray as xr
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from pathlib import Path
 from collections import deque
 from skimage import measure, morphology
 import json
+import pandas as pd
 
 # ============================================================
 # 1 Datacube import with orientation + preview
 # ============================================================
-# We need to be able to see what we are doing, to find the box
-# (reflectance panel) which is quite the task, especially in the SWIR wavelengths!
+# We need to be able to see what we are doing, to find the reflectance panel and set a bounding box
+# which is quite the task, especially in the SWIR wavelengths
 
+# define functions:
 def import_datacube(bin_path, verify_orientation=True, save_preview=True, dtype=np.uint16):
     bin_path = Path(bin_path)
     if not bin_path.exists():
@@ -248,11 +244,6 @@ def visualise_swir_panel_overlay(cube, bbox, wavelengths, save_path):
 # ============================================================
 # 4 Other helpers - reflectance conversion
 # ============================================================
-import numpy as np
-import xarray as xr
-import matplotlib.pyplot as plt
-from pathlib import Path
-import pandas as pd
 
 def read_detection_json(json_path: Path):
     """Read VNIR or SWIR detection JSON and return .bin path + bbox."""
