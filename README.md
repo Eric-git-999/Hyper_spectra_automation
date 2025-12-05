@@ -35,7 +35,7 @@ The workflow is implemented in a Jupyter Notebook and follows these steps:
    - Allows you to specify a netCDF reflectance cube to examine how it looks.
   
 5. **Signal-to-noise ratio calculation** 
-   - With specifying the reflectance panel data and reflectance cube, allows calcualtion of SNR for a given scan
+   - With specifying the reflectance panel data and reflectance cube, allows calcualtion of SNR for a given scan.
 
 ## Usage
 
