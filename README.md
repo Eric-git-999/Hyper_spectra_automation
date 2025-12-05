@@ -130,5 +130,5 @@ After running the workflow, the following outputs will be generated:
 ![VNIR Panel reflectance 1](images/VNIR_p1.png)
 ![SWIR Panel reflectance 1](images/SWIR_p1.png)
 ![SWIR Panel reflectance cube display](images/SWIR_p2.png)
-![Signal-to-noise-ratio calculation](images/SNR.png)
-
+![Signal-to-noise-ratio VNIR calculation](images/SNR.png)
+![Signal-to-noise-ratio SWIR calculation](images/SNR_SWIR.png)
