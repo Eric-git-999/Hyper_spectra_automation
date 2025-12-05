@@ -33,6 +33,9 @@ The workflow is implemented in a Jupyter Notebook and follows these steps:
 
 5. **Interactive NetCDF Reflectance Cube Viewer**  
    - Allows you to specify a netCDF reflectance cube to examine how it looks.
+  
+5. **Signal-to-noise ratio calculation** 
+   - With specifying the reflectance panel data and reflectance cube, allows calcualtion of SNR for a given scan
 
 ## Usage
 
@@ -88,7 +91,7 @@ jupyter notebook auto_spectra.ipynb
 ```
 
 3. Configure paths and run each cell sequentially. Ensure dependencies are installed, it is recommended to set up a new Conda environemnt for this workflow.
-
+   - You can run the notebook on the example folder provided, "20250313".
 
 ## Dependencies
 
