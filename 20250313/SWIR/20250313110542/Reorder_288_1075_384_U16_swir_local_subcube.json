@@ -1,0 +1,48 @@
+{
+  "file": "C:\\Users\\eric\\Documents\\Spectro_Auto_latest_V\\20250313\\SWIR\\20250313110542\\Reorder_288_1075_384_U16.bin",
+  "mapped_direct_bbox": [
+    441,
+    127,
+    643,
+    182
+  ],
+  "search_box": [
+    387,
+    69,
+    697,
+    240
+  ],
+  "detected_bbox": [
+    473,
+    69,
+    673,
+    231
+  ],
+  "vnir_bbox": [
+    425,
+    212,
+    620,
+    304
+  ],
+  "vnir_shape": [
+    640,
+    1037,
+    272
+  ],
+  "swir_shape": [
+    384,
+    1075,
+    288
+  ],
+  "informative_bands": [
+    0,
+    57,
+    105,
+    153,
+    230
+  ],
+  "seed_subcube": [
+    280,
+    6
+  ]
+}
