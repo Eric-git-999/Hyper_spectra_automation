@@ -97,8 +97,9 @@ jupyter notebook auto_spectra.ipynb
 
 This workflow requires the following Python libraries:
 
-- Python 3.8 or higher
-- NumPy
+- Python 3.8 or higher (recommended 3.10)
+- NumPy 1.26
+- opencv
 - Pandas
 - Matplotlib
 - xarray
